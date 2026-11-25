@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VaultDrop — Encrypted Media &amp; .ahnu File Vault</title>
+    <meta
+      name="description"
+      content="Open-source zero-knowledge platform to encrypt photos, videos, and audio into .ahnu files or share them via self-expiring 24h links."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./css/styles.css" />
+    <!-- Optional progressive HEIC preview helper for browsers without native HEIC decoding -->
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"
+    ></script>
+  </head>
+  <body>
+    <div class="bg-grid" aria-hidden="true"></div>
+
+    <!-- Top Navigation -->
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a href="./" class="brand" id="brand-home-link">
+          <span class="brand-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 2L4 5.5V11.5C4 16.8 7.4 21.6 12 23C16.6 21.6 20 16.8 20 11.5V5.5L12 2Z"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linejoin="round"
+              />
+              <rect
+                x="9"
+                y="10.5"
+                width="6"
+                height="5"
+                rx="1.2"
+                stroke="currentColor"
+                stroke-width="1.8"
+              />
+              <path
+                d="M10.2 10.5V8.8C10.2 7.8 11 7 12 7C13 7 13.8 7.8 13.8 8.8V10.5"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              />
+            </svg>
+          </span>
+          <span class="brand-text">
+            <strong>VaultDrop</strong>
+            <span class="badge-ahnu">.ahnu</span>
+          </span>
+        </a>
+
+        <nav class="nav-tabs" aria-label="Main sections">
+          <button class="nav-tab active" data-view="encrypt">
+            Encrypt &amp; Send
+          </button>
+          <button class="nav-tab" data-view="decrypt">
+            Decrypt .ahnu
+          </button>
+          <button class="nav-tab" data-view="links">
+            My Links
+          </button>
+        </nav>
+
+        <div class="topbar-actions">
+          <button
+            class="btn btn-ghost btn-sm"
+            id="btn-open-spec"
+            title="View .ahnu Binary Format Specification"
+          >
+            .ahnu Spec
+          </button>
+          <button
+            class="btn btn-ghost btn-sm"
+            id="btn-open-firebase-setup"
+            title="Configure Firebase Auth & Firestore"
+          >
+            <span class="status-dot" id="storage-mode-dot"></span>
+            <span id="storage-mode-label">Sandbox</span>
+          </button>
+          <button class="btn btn-outline btn-sm" id="btn-auth">
+            Sign In
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Mode / Setup Info Banner -->
+    <div class="mode-banner hidden" id="mode-banner">
+      <div class="container mode-banner-inner">
+        <span id="mode-banner-text">
+          Running in <strong>Local Sandbox Mode</strong> — .ahnu file encryption
+          works offline, and test links are stored in this browser. Connect
+          Firebase for public cross-device links.
+        </span>
+        <button class="btn btn-xs btn-outline" id="btn-banner-setup">
+          Connect Firebase
+        </button>
+      </div>
+    </div>
+
+    <main class="container main-content">
+      <!-- Hero Intro (hidden on shared-link direct view) -->
+      <section class="hero" id="hero-section">
+        <div class="hero-pill">
+          <span class="pulse-dot"></span>
+          Client-Side AES-256-GCM · Zero-Knowledge .ahnu Container
+        </div>
+        <h1>Send photos, videos &amp; audio with unbreakable privacy.</h1>
+        <p class="hero-sub">
+          Encrypt media directly in your browser into the open-source
+          <code>.ahnu</code> format, or generate a self-destructing share link
+          valid for up to <strong>24 hours</strong>. Your password never leaves
+          your device.
+        </p>
+        <div class="supported-strip">
+          <span><strong>Photos:</strong> .jpg .jpeg .png .heic</span>
+          <span><strong>Videos:</strong> .mp4 .mov .mkv</span>
+          <span><strong>Audio:</strong> .mp3</span>
+        </div>
+      </section>
+
+      <!-- ================================================================ -->
+      <!-- VIEW 1: ENCRYPT & SEND                                           -->
+      <!-- ================================================================ -->
+      <section class="view-panel active" id="view-encrypt">
+        <div class="grid-two">
+          <!-- Left Card: Upload & Password -->
+          <div class="card">
+            <div class="card-header">
+              <h2>1. Select Media &amp; Set Password</h2>
+              <span class="chip">AES-256-GCM</span>
+            </div>
+
+            <div class="dropzone" id="encrypt-dropzone" tabindex="0" role="button">
+              <input
+                type="file"
+                id="encrypt-file-input"
+                accept=".jpg,.jpeg,.png,.heic,.mp4,.mov,.mkv,.mp3,image/jpeg,image/png,image/heic,image/heif,video/mp4,video/quicktime,video/x-matroska,audio/mpeg"
+                hidden
+              />
+              <div class="dropzone-icon">🛡️</div>
+              <p class="dropzone-title">
+                Drop your photo, video, or audio file here
+              </p>
+              <p class="dropzone-sub">
+                or <span class="link-accent">browse files</span> from your device
+              </p>
+              <p class="dropzone-formats">
+                Accepted: .jpg .png .jpeg .heic · .mp4 .mov .mkv · .mp3
+              </p>
+            </div>
+
+            <!-- Selected File Card -->
+            <div class="selected-file-card hidden" id="encrypt-file-card">
+              <div class="file-meta-row">
+                <div class="file-badge-icon" id="encrypt-file-icon">🖼️</div>
+                <div class="file-info">
+                  <div class="file-name" id="encrypt-file-name">photo.jpg</div>
+                  <div class="file-sub" id="encrypt-file-sub">
+                    Photo · 2.4 MB
+                  </div>
+                </div>
+                <button
+                  class="btn btn-ghost btn-xs"
+                  id="btn-clear-encrypt-file"
+                  type="button"
+                >
+                  Change
+                </button>
+              </div>
+              <div class="mini-preview hidden" id="encrypt-mini-preview"></div>
+            </div>
+
+            <!-- Password Setup -->
+            <div class="form-group">
+              <label for="encrypt-password">Encryption Password</label>
+              <div class="input-with-action">
+                <input
+                  type="password"
+                  id="encrypt-password"
+                  placeholder="Enter a strong password (min 4 chars)"
+                  autocomplete="new-password"
+                />
+                <button
+                  type="button"
+                  class="btn-icon-toggle"
+                  data-toggle-pw="encrypt-password"
+                  title="Show/Hide password"
+                >
+                  👁️
+                </button>
+              </div>
+              <div class="strength-bar-wrap">
+                <div class="strength-bar">
+                  <div class="strength-fill" id="encrypt-strength-fill"></div>
+                </div>
+                <span class="strength-label" id="encrypt-strength-label">
+                  Enter a password
+                </span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="encrypt-password-confirm">Confirm Password</label>
+              <input
+                type="password"
+                id="encrypt-password-confirm"
+                placeholder="Re-enter password"
+                autocomplete="new-password"
+              />
+            </div>
+          </div>
+
+          <!-- Right Card: Export .ahnu or Generate Expiring Link -->
+          <div class="card">
+            <div class="card-header">
+              <h2>2. Download .ahnu or Share Link</h2>
+              <span class="chip chip-cyan">Max 24h Link</span>
+            </div>
+
+            <!-- Action A: Download .ahnu -->
+            <div class="action-box">
+              <div class="action-box-header">
+                <h3>Download Encrypted <code>.ahnu</code> File</h3>
+                <span class="muted-text">No size limit · Works offline</span>
+              </div>
+              <p class="muted-text">
+                Converts your media into a tamper-proof <code>.ahnu</code> file
+                that can only be unlocked on VaultDrop (or upcoming Android/iOS
+                apps) with your password.
+              </p>
+              <button
+                class="btn btn-primary btn-full"
+                id="btn-download-ahnu"
+                disabled
+              >
+                🔐 Encrypt &amp; Download .ahnu File
+              </button>
+            </div>
+
+            <div class="divider-or"><span>OR</span></div>
+
+            <!-- Action B: Share Expiring Link -->
+            <div class="action-box">
+              <div class="action-box-header">
+                <h3>Create Expiring Share Link</h3>
+                <span class="muted-text">Max 24 hours · Up to 12 MB</span>
+              </div>
+
+              <div class="form-group">
+                <label>Link Expiration Time (Max 24 hours / 1 day)</label>
+                <div class="ttl-presets" id="ttl-presets">
+                  <button type="button" class="ttl-pill" data-minutes="15">
+                    15 min
+                  </button>
+                  <button type="button" class="ttl-pill active" data-minutes="60">
+                    1 hour
+                  </button>
+                  <button type="button" class="ttl-pill" data-minutes="360">
+                    6 hours
+                  </button>
+                  <button type="button" class="ttl-pill" data-minutes="720">
+                    12 hours
+                  </button>
+                  <button type="button" class="ttl-pill" data-minutes="1440">
+                    24 hours (Max)
+                  </button>
+                </div>
+
+                <div class="custom-ttl-row">
+                  <label for="custom-ttl-hours" class="inline-label">
+                    Custom (1–24 hrs):
+                  </label>
+                  <input
+                    type="number"
+                    id="custom-ttl-hours"
+                    min="0.1"
+                    max="24"
+                    step="0.5"
+                    value="1"
+                  />
+                  <span class="muted-text" id="ttl-summary">
+                    Expires in 1 hour
+                  </span>
+                </div>
+              </div>
+
+              <button
+                class="btn btn-secondary btn-full"
+                id="btn-create-share-link"
+                disabled
+              >
+                🔗 Encrypt &amp; Generate Share Link
+              </button>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="progress-wrap hidden" id="encrypt-progress-wrap">
+              <div class="progress-meta">
+                <span id="encrypt-progress-stage">Encrypting...</span>
+                <span id="encrypt-progress-pct">0%</span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" id="encrypt-progress-fill"></div>
+              </div>
+            </div>
+
+            <!-- Share Link Result Box -->
+            <div class="share-result-card hidden" id="share-result-card">
+              <div class="share-result-badge">✅ Encrypted Link Active</div>
+              <p class="muted-text">
+                Share this link and separately send the password to your
+                recipient. Link expires <strong id="share-result-expiry"></strong>.
+              </p>
+              <div class="copy-row">
+                <input type="text" id="share-result-url" readonly />
+                <button class="btn btn-primary btn-sm" id="btn-copy-share-url">
+                  Copy
+                </button>
+              </div>
+              <div class="share-result-actions">
+                <a
+                  href="#"
+                  target="_blank"
+                  rel="noopener"
+                  class="btn btn-ghost btn-xs"
+                  id="btn-test-share-url"
+                >
+                  Open Link ↗
+                </a>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-xs"
+                  id="btn-download-shared-ahnu"
+                >
+                  Also Download .ahnu
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================ -->
+      <!-- VIEW 2: DECRYPT .ahnu FILE                                       -->
+      <!-- ================================================================ -->
+      <section class="view-panel" id="view-decrypt">
+        <div class="grid-two">
+          <div class="card">
+            <div class="card-header">
+              <h2>1. Upload Encrypted .ahnu File</h2>
+              <span class="chip">.ahnu v1</span>
+            </div>
+
+            <div class="dropzone" id="decrypt-dropzone" tabindex="0" role="button">
+              <input
+                type="file"
+                id="decrypt-file-input"
+                accept=".ahnu"
+                hidden
+              />
+              <div class="dropzone-icon">🗝️</div>
+              <p class="dropzone-title">Drop your .ahnu file here</p>
+              <p class="dropzone-sub">
+                or <span class="link-accent">select a .ahnu file</span> to unlock
+              </p>
+              <p class="dropzone-formats">
+                Only authentic VaultDrop .ahnu containers are accepted
+              </p>
+            </div>
+
+            <div class="selected-file-card hidden" id="decrypt-file-card">
+              <div class="file-meta-row">
+                <div class="file-badge-icon">🔐</div>
+                <div class="file-info">
+                  <div class="file-name" id="decrypt-file-name">secret.ahnu</div>
+                  <div class="file-sub" id="decrypt-file-sub">
+                    AHNU v1 · AES-256-GCM · PBKDF2 310,000 rounds
+                  </div>
+                </div>
+                <button
+                  class="btn btn-ghost btn-xs"
+                  id="btn-clear-decrypt-file"
+                  type="button"
+                >
+                  Change
+                </button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="decrypt-password">File Password</label>
+              <div class="input-with-action">
+                <input
+                  type="password"
+                  id="decrypt-password"
+                  placeholder="Enter password to unlock .ahnu file"
+                  autocomplete="current-password"
+                />
+                <button
+                  type="button"
+                  class="btn-icon-toggle"
+                  data-toggle-pw="decrypt-password"
+                  title="Show/Hide password"
+                >
+                  👁️
+                </button>
+              </div>
+            </div>
+
+            <button class="btn btn-primary btn-full" id="btn-decrypt-file" disabled>
+              🔓 Decrypt &amp; Open Media
+            </button>
+
+            <div class="progress-wrap hidden" id="decrypt-progress-wrap">
+              <div class="progress-meta">
+                <span id="decrypt-progress-stage">Decrypting...</span>
+                <span id="decrypt-progress-pct">0%</span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" id="decrypt-progress-fill"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Decrypted Media Output -->
+          <div class="card">
+            <div class="card-header">
+              <h2>2. Decrypted Media Viewer</h2>
+              <span class="chip chip-cyan" id="decrypt-output-badge">Locked</span>
+            </div>
+
+            <div class="decrypted-empty" id="decrypt-empty-state">
+              <div class="empty-icon">🔒</div>
+              <p>Upload a <code>.ahnu</code> file and enter its password.</p>
+              <p class="muted-text">
+                Decryption happens 100% locally in your browser. Once unlocked,
+                you can preview the photo/video/audio and download the original
+                file.
+              </p>
+            </div>
+
+            <div class="hidden" id="decrypt-result-panel">
+              <div class="decrypted-meta-bar">
+                <div>
+                  <strong id="decrypted-orig-name">file.jpg</strong>
+                  <span class="muted-text" id="decrypted-orig-info">
+                    Photo · 1.2 MB
+                  </span>
+                </div>
+                <button
+                  class="btn btn-primary btn-sm"
+                  id="btn-download-decrypted"
+                >
+                  ⬇ Download Original File
+                </button>
+              </div>
+              <div class="media-stage" id="decrypt-media-stage"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================ -->
+      <!-- VIEW 3: MY VAULT LINKS                                           -->
+      <!-- ================================================================ -->
+      <section class="view-panel" id="view-links">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>My Shared Vault Links</h2>
+              <p class="muted-text">
+                Manage and revoke your expiring links (all links automatically
+                expire within 24 hours).
+              </p>
+            </div>
+            <button class="btn btn-outline btn-sm" id="btn-refresh-links">
+              ↻ Refresh
+            </button>
+          </div>
+
+          <div id="links-auth-prompt" class="empty-box hidden">
+            <p>Sign in with Firebase Auth to view and revoke your active links.</p>
+            <button class="btn btn-primary btn-sm" id="btn-links-signin">
+              Sign In / Continue as Guest
+            </button>
+          </div>
+
+          <div id="links-list-container" class="links-list"></div>
+        </div>
+      </section>
+
+      <!-- ================================================================ -->
+      <!-- VIEW 4: SHARED LINK LANDING (?share=ID)                          -->
+      <!-- ================================================================ -->
+      <section class="view-panel" id="view-shared">
+        <div class="shared-container">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2>Encrypted Vault Link</h2>
+                <p class="muted-text" id="shared-sender-info">
+                  Loading encrypted .ahnu container...
+                </p>
+              </div>
+              <span class="countdown-pill" id="shared-countdown-pill">
+                --:--:--
+              </span>
+            </div>
+
+            <div id="shared-loading-box" class="empty-box">
+              <div class="spinner"></div>
+              <p id="shared-loading-text">Fetching encrypted .ahnu payload...</p>
+            </div>
+
+            <div id="shared-error-box" class="error-box hidden">
+              <div class="empty-icon">⛔</div>
+              <h3 id="shared-error-title">Link Unavailable</h3>
+              <p id="shared-error-msg" class="muted-text"></p>
+              <button class="btn btn-outline btn-sm" id="btn-shared-go-home">
+                Return to VaultDrop
+              </button>
+            </div>
+
+            <div id="shared-unlock-box" class="hidden">
+              <div class="selected-file-card">
+                <div class="file-meta-row">
+                  <div class="file-badge-icon" id="shared-category-icon">🔐</div>
+                  <div class="file-info">
+                    <div class="file-name" id="shared-file-label">
+                      Encrypted .ahnu Media
+                    </div>
+                    <div class="file-sub" id="shared-file-sub">
+                      AES-256-GCM · Ready to unlock
+                    </div>
+                  </div>
+                  <button
+                    class="btn btn-ghost btn-xs"
+                    id="btn-download-raw-ahnu"
+                    title="Download the encrypted .ahnu file without decrypting"
+                  >
+                    ⬇ Save .ahnu
+                  </button>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="shared-password">Enter Decryption Password</label>
+                <div class="input-with-action">
+                  <input
+                    type="password"
+                    id="shared-password"
+                    placeholder="Password set by the sender"
+                  />
+                  <button
+                    type="button"
+                    class="btn-icon-toggle"
+                    data-toggle-pw="shared-password"
+                  >
+                    👁️
+                  </button>
+                </div>
+              </div>
+
+              <button class="btn btn-primary btn-full" id="btn-unlock-shared">
+                🔓 Unlock &amp; View Media
+              </button>
+            </div>
+
+            <div id="shared-decrypted-box" class="hidden">
+              <div class="decrypted-meta-bar">
+                <div>
+                  <strong id="shared-orig-name">media</strong>
+                  <span class="muted-text" id="shared-orig-info"></span>
+                </div>
+                <button
+                  class="btn btn-primary btn-sm"
+                  id="btn-download-shared-original"
+                >
+                  ⬇ Download Original File
+                </button>
+              </div>
+              <div class="media-stage" id="shared-media-stage"></div>
+            </div>
+          </div>
+
+          <div class="shared-footer-link">
+            <button class="btn btn-ghost btn-sm" id="btn-shared-back-home">
+              ← Encrypt &amp; Send Your Own File on VaultDrop
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container footer-inner">
+        <span>
+          <strong>VaultDrop</strong> · Open Source Zero-Knowledge Media Transfer
+          (<code>.ahnu</code> v1)
+        </span>
+        <span class="muted-text">
+          Web Crypto AES-256-GCM · PBKDF2-SHA256 (310,000 iterations)
+        </span>
+      </div>
+    </footer>
+
+    <!-- ================================================================== -->
+    <!-- MODAL: FIREBASE AUTH                                               -->
+    <!-- ================================================================== -->
+    <div class="modal-backdrop hidden" id="modal-auth">
+      <div class="modal-card" role="dialog" aria-modal="true">
+        <div class="modal-header">
+          <h3>VaultDrop Account (Firebase Auth)</h3>
+          <button class="btn btn-ghost btn-xs" data-close-modal="modal-auth">
+            ✕
+          </button>
+        </div>
+
+        <div id="auth-signed-in-view" class="hidden">
+          <div class="auth-profile-box">
+            <div class="auth-avatar">🛡️</div>
+            <div>
+              <strong id="auth-user-name">User</strong>
+              <div class="muted-text" id="auth-user-email"></div>
+            </div>
+          </div>
+          <button class="btn btn-outline btn-full" id="btn-sign-out">
+            Sign Out
+          </button>
+        </div>
+
+        <div id="auth-signed-out-view">
+          <div class="auth-tabs">
+            <button class="auth-tab active" data-auth-mode="signin">
+              Sign In
+            </button>
+            <button class="auth-tab" data-auth-mode="signup">
+              Create Account
+            </button>
+          </div>
+
+          <form id="auth-email-form">
+            <div class="form-group hidden" id="auth-name-group">
+              <label for="auth-display-name">Display Name</label>
+              <input
+                type="text"
+                id="auth-display-name"
+                placeholder="e.g. Anushka"
+              />
+            </div>
+            <div class="form-group">
+              <label for="auth-email">Email</label>
+              <input
+                type="email"
+                id="auth-email"
+                required
+                placeholder="you@example.com"
+              />
+            </div>
+            <div class="form-group">
+              <label for="auth-password">Password</label>
+              <input
+                type="password"
+                id="auth-password"
+                required
+                minlength="6"
+                placeholder="Min 6 characters"
+              />
+            </div>
+            <button
+              type="submit"
+              class="btn btn-primary btn-full"
+              id="btn-auth-submit"
+            >
+              Sign In with Email
+            </button>
+          </form>
+
+          <div class="divider-or"><span>OR</span></div>
+
+          <div class="auth-providers">
+            <button
+              type="button"
+              class="btn btn-outline btn-full"
+              id="btn-google-signin"
+            >
+              Continue with Google
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-full"
+              id="btn-guest-signin"
+            >
+              Continue as Anonymous Guest
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- MODAL: FIREBASE SETUP                                              -->
+    <!-- ================================================================== -->
+    <div class="modal-backdrop hidden" id="modal-firebase">
+      <div class="modal-card modal-lg" role="dialog" aria-modal="true">
+        <div class="modal-header">
+          <h3>Firebase Auth &amp; Firestore Setup</h3>
+          <button
+            class="btn btn-ghost btn-xs"
+            data-close-modal="modal-firebase"
+          >
+            ✕
+          </button>
+        </div>
+
+        <p class="muted-text">
+          Paste your Firebase Web App config JSON below to test Firebase Auth
+          and Firestore link sharing immediately in this browser, or edit
+          <code>js/firebase-config.js</code> before deploying to GitHub Pages.
+        </p>
+
+        <form id="firebase-config-form">
+          <div class="form-group">
+            <label for="firebase-config-json">
+              Firebase Config JSON (from Firebase Console → Project Settings)
+            </label>
+            <textarea
+              id="firebase-config-json"
+              rows="8"
+              placeholder='{
+  "apiKey": "...",
+  "authDomain": "your-app.firebaseapp.com",
+  "projectId": "your-app",
+  "storageBucket": "your-app.appspot.com",
+  "messagingSenderId": "...",
+  "appId": "..."
+}'
+            ></textarea>
+          </div>
+          <div class="modal-footer-actions">
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              id="btn-reset-firebase"
+            >
+              Reset to Local Sandbox
+            </button>
+            <button type="submit" class="btn btn-primary btn-sm">
+              Save &amp; Connect Firebase
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- MODAL: .ahnu BINARY SPECIFICATION                                  -->
+    <!-- ================================================================== -->
+    <div class="modal-backdrop hidden" id="modal-spec">
+      <div class="modal-card modal-lg" role="dialog" aria-modal="true">
+        <div class="modal-header">
+          <h3>Open-Source <code>.ahnu</code> File Format Specification (v1)</h3>
+          <button class="btn btn-ghost btn-xs" data-close-modal="modal-spec">
+            ✕
+          </button>
+        </div>
+        <p class="muted-text">
+          Designed so encrypted media files can be created and opened identically
+          across the <strong>VaultDrop Web App</strong> and future
+          <strong>Android / iOS</strong> native apps.
+        </p>
+        <div class="spec-table-wrap">
+          <table class="spec-table">
+            <thead>
+              <tr>
+                <th>Offset</th>
+                <th>Size</th>
+                <th>Field</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>0x00</td>
+                <td>4 B</td>
+                <td>Magic</td>
+                <td>ASCII <code>AHNU</code> (<code>41 48 4E 55</code>)</td>
+              </tr>
+              <tr>
+                <td>0x04</td>
+                <td>1 B</td>
+                <td>Version</td>
+                <td><code>0x01</code></td>
+              </tr>
+              <tr>
+                <td>0x05</td>
+                <td>1 B</td>
+                <td>Cipher Suite</td>
+                <td><code>0x01</code> (PBKDF2-SHA256 + AES-256-GCM)</td>
+              </tr>
+              <tr>
+                <td>0x06</td>
+                <td>4 B</td>
+                <td>Iterations</td>
+                <td>Uint32 BE (default <code>310000</code>)</td>
+              </tr>
+              <tr>
+                <td>0x0A</td>
+                <td>16 B</td>
+                <td>Salt</td>
+                <td>Cryptographically random salt per file</td>
+              </tr>
+              <tr>
+                <td>0x1A</td>
+                <td>12 B</td>
+                <td>IV / Nonce</td>
+                <td>Cryptographically random 96-bit GCM IV</td>
+              </tr>
+              <tr>
+                <td>0x26</td>
+                <td>Var</td>
+                <td>Encrypted Payload</td>
+                <td>
+                  AES-256-GCM ciphertext + 16B tag wrapping
+                  <code>[4B metaLen][JSON metadata][raw media bytes]</code>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+    <script type="module" src="./js/app.js"></script>
+  </body>
+</html>
