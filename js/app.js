@@ -8,6 +8,8 @@ import {
   decryptFromAhnu,
   inspectAhnuHeader,
 } from './crypto-ahnu.js';
+import { buildZipArchive } from './zip-utils.js';
+import { initCursorRects } from './cursor-rects.js';
 import {
   storageService,
   clampTtlMinutes,
@@ -26,9 +28,11 @@ import {
 } from './ui-components.js';
 
 const state = {
+  encryptFiles: [],
   encryptFile: null,
   encryptValidation: null,
   encryptPreviewUrl: null,
+  preparedResult: null, // { isZip, ahnuBytes?, ahnuFilename?, metadata?, zipBytes?, zipFilename?, count? }
   ttlMinutes: 60,
   lastSharedAhnu: null, // { bytes, filename }
 
@@ -53,7 +57,7 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 
-function bindDropzone(dropzoneEl, inputEl, onFileSelected) {
+function bindDropzone(dropzoneEl, inputEl, onFilesSelected) {
   dropzoneEl.addEventListener('click', () => inputEl.click());
   dropzoneEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -71,12 +75,16 @@ function bindDropzone(dropzoneEl, inputEl, onFileSelected) {
   dropzoneEl.addEventListener('drop', (e) => {
     e.preventDefault();
     dropzoneEl.classList.remove('dragover');
-    const file = e.dataTransfer?.files?.[0];
-    if (file) onFileSelected(file);
+    const files = e.dataTransfer?.files;
+    if (files?.length) {
+      onFilesSelected(inputEl.multiple ? Array.from(files) : files[0]);
+    }
   });
   inputEl.addEventListener('change', () => {
-    const file = inputEl.files?.[0];
-    if (file) onFileSelected(file);
+    const files = inputEl.files;
+    if (files?.length) {
+      onFilesSelected(inputEl.multiple ? Array.from(files) : files[0]);
+    }
     inputEl.value = '';
   });
 }
@@ -98,7 +106,8 @@ function setProgress(prefix, visible, stage = '', pct = 0) {
 
 function switchView(viewName) {
   const isShared = viewName === 'shared';
-  $('hero-section').classList.toggle('hidden', isShared);
+  $('hero-section')?.classList.toggle('hidden', isShared);
+  $('mode-switcher-wrap')?.classList.toggle('hidden', isShared);
 
   document.querySelectorAll('.nav-tab').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.view === viewName);
@@ -125,57 +134,88 @@ function closeModal(id) {
 /*  View 1: Encrypt & Send                                                    */
 /* -------------------------------------------------------------------------- */
 
-function handleSelectEncryptFile(file) {
-  const validation = validateMediaFile(file);
-  if (!validation.valid) {
-    showToast(validation.error, 'error');
-    return;
+function handleSelectEncryptFile(fileOrFiles) {
+  const incoming = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
+  const validFiles = [];
+  let firstValidation = null;
+
+  for (const f of incoming) {
+    const v = validateMediaFile(f);
+    if (!v.valid) {
+      showToast(`${f.name}: ${v.error}`, 'error');
+      continue;
+    }
+    if (!firstValidation) firstValidation = v;
+    validFiles.push(f);
   }
+
+  if (!validFiles.length) return;
 
   if (state.encryptPreviewUrl) {
     URL.revokeObjectURL(state.encryptPreviewUrl);
     state.encryptPreviewUrl = null;
   }
 
-  state.encryptFile = file;
-  state.encryptValidation = validation;
+  state.encryptFiles = validFiles;
+  state.encryptFile = validFiles[0];
+  state.encryptValidation = firstValidation;
+  state.preparedResult = null;
   state.lastSharedAhnu = null;
   $('share-result-card').classList.add('hidden');
 
-  const badge = categoryBadge(validation.category);
-  $('encrypt-file-icon').textContent = badge.icon;
-  $('encrypt-file-name').textContent = file.name;
-  $('encrypt-file-sub').textContent = `${badge.label} (${validation.ext}) · ${formatBytes(file.size)}`;
-  $('encrypt-file-card').classList.remove('hidden');
-
   const previewEl = $('encrypt-mini-preview');
+  const multiListEl = $('encrypt-multi-list');
   previewEl.innerHTML = '';
   previewEl.classList.add('hidden');
+  multiListEl.innerHTML = '';
+  multiListEl.classList.add('hidden');
 
-  const url = URL.createObjectURL(file);
-  state.encryptPreviewUrl = url;
+  if (validFiles.length === 1) {
+    const file = validFiles[0];
+    const badge = categoryBadge(firstValidation.category);
+    $('encrypt-file-icon').textContent = badge.icon;
+    $('encrypt-file-name').textContent = file.name;
+    $('encrypt-file-sub').textContent = `${badge.label} (${firstValidation.ext}) · ${formatBytes(file.size)}`;
 
-  if (validation.category === 'photo' && validation.ext !== '.heic') {
-    const img = document.createElement('img');
-    img.src = url;
-    img.alt = file.name;
-    previewEl.appendChild(img);
-    previewEl.classList.remove('hidden');
-  } else if (validation.category === 'video') {
-    const video = document.createElement('video');
-    video.src = url;
-    video.controls = true;
-    video.muted = true;
-    previewEl.appendChild(video);
-    previewEl.classList.remove('hidden');
-  } else if (validation.category === 'audio') {
-    const audio = document.createElement('audio');
-    audio.src = url;
-    audio.controls = true;
-    previewEl.appendChild(audio);
-    previewEl.classList.remove('hidden');
+    const url = URL.createObjectURL(file);
+    state.encryptPreviewUrl = url;
+
+    if (firstValidation.category === 'photo' && firstValidation.ext !== '.heic') {
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = file.name;
+      previewEl.appendChild(img);
+      previewEl.classList.remove('hidden');
+    } else if (firstValidation.category === 'video') {
+      const video = document.createElement('video');
+      video.src = url;
+      video.controls = true;
+      video.muted = true;
+      previewEl.appendChild(video);
+      previewEl.classList.remove('hidden');
+    } else if (firstValidation.category === 'audio') {
+      const audio = document.createElement('audio');
+      audio.src = url;
+      audio.controls = true;
+      previewEl.appendChild(audio);
+      previewEl.classList.remove('hidden');
+    }
+  } else {
+    const totalBytes = validFiles.reduce((sum, f) => sum + f.size, 0);
+    $('encrypt-file-icon').textContent = '🗜️';
+    $('encrypt-file-name').textContent = `${validFiles.length} files selected`;
+    $('encrypt-file-sub').textContent = `${formatBytes(totalBytes)} · Will encrypt each to .ahnu & bundle as .zip`;
+    for (const f of validFiles) {
+      const chip = document.createElement('span');
+      chip.className = 'multi-file-chip';
+      chip.textContent = f.name;
+      multiListEl.appendChild(chip);
+    }
+    multiListEl.classList.remove('hidden');
   }
 
+  $('encrypt-file-card').classList.remove('hidden');
+  $('encrypt-dropzone').classList.add('hidden');
   updateEncryptActionButtons();
 }
 
@@ -184,10 +224,14 @@ function clearEncryptFile() {
     URL.revokeObjectURL(state.encryptPreviewUrl);
     state.encryptPreviewUrl = null;
   }
+  state.encryptFiles = [];
   state.encryptFile = null;
   state.encryptValidation = null;
+  state.preparedResult = null;
   $('encrypt-file-card').classList.add('hidden');
+  $('encrypt-dropzone').classList.remove('hidden');
   $('encrypt-mini-preview').innerHTML = '';
+  $('encrypt-multi-list').innerHTML = '';
   updateEncryptActionButtons();
 }
 
@@ -202,9 +246,22 @@ function updateEncryptActionButtons() {
   $('encrypt-strength-label').textContent = strength.label;
   $('encrypt-strength-label').style.color = strength.color;
 
-  const ready = Boolean(state.encryptFile) && pw.length >= 4 && pw === confirmPw;
-  $('btn-download-ahnu').disabled = !ready;
-  $('btn-create-share-link').disabled = !ready;
+  const matchHint = $('password-match-hint');
+  if (matchHint) {
+    if (!confirmPw) {
+      matchHint.textContent = '';
+      matchHint.className = 'match-hint';
+    } else if (pw === confirmPw) {
+      matchHint.textContent = 'Passwords match ✓';
+      matchHint.className = 'match-hint ok';
+    } else {
+      matchHint.textContent = 'Does not match';
+      matchHint.className = 'match-hint err';
+    }
+  }
+
+  const ready = state.encryptFiles.length > 0 && pw.length >= 4 && pw === confirmPw;
+  $('btn-encrypt-now').disabled = !ready;
 }
 
 function setTtlMinutes(minutes) {
@@ -212,6 +269,8 @@ function setTtlMinutes(minutes) {
   state.ttlMinutes = clamped;
   const hours = Number((clamped / 60).toFixed(2));
   $('custom-ttl-hours').value = hours;
+  const slider = $('ttl-range-slider');
+  if (slider) slider.value = String(clamped);
 
   if (clamped < 60) {
     $('ttl-summary').textContent = `Expires in ${clamped} min`;
@@ -227,7 +286,7 @@ function setTtlMinutes(minutes) {
 }
 
 function validateEncryptInputs() {
-  if (!state.encryptFile) {
+  if (!state.encryptFiles.length) {
     showToast('Please select a photo, video, or audio file first.', 'error');
     return null;
   }
@@ -244,34 +303,96 @@ function validateEncryptInputs() {
   return pw;
 }
 
-async function handleDownloadAhnu() {
+async function handleEncryptNow() {
   const pw = validateEncryptInputs();
   if (!pw) return;
 
-  const btn = $('btn-download-ahnu');
+  const btn = $('btn-encrypt-now');
   btn.disabled = true;
-  $('btn-create-share-link').disabled = true;
 
   try {
-    setProgress('encrypt', true, 'Starting encryption...', 5);
-    const { ahnuBytes, ahnuFilename } = await encryptToAhnu(
-      state.encryptFile,
-      pw,
-      (stage, pct) => setProgress('encrypt', true, stage, pct)
-    );
-    triggerBlobDownload(ahnuBytes, 'application/octet-stream', ahnuFilename);
-    showToast(`Downloaded encrypted file: ${ahnuFilename}`, 'success');
+    if (state.encryptFiles.length === 1) {
+      const file = state.encryptFiles[0];
+      setProgress('encrypt', true, 'Encrypting into .ahnu format...', 10);
+      const { ahnuBytes, ahnuFilename, metadata } = await encryptToAhnu(
+        file,
+        pw,
+        (stage, pct) => setProgress('encrypt', true, stage, pct)
+      );
+      state.preparedResult = {
+        isZip: false,
+        ahnuBytes,
+        ahnuFilename,
+        metadata,
+      };
+      $('encrypt-result-modal-title').textContent = 'Encrypted & Ready';
+      $('encrypt-result-modal-sub').textContent =
+        'Your file is encrypted with AES-256-GCM. Download it or share via a 24h link:';
+      $('popup-download-title').innerHTML =
+        '1. Download Encrypted <code>.ahnu</code> File';
+      $('popup-download-meta').textContent = formatBytes(ahnuBytes.length);
+      $('btn-download-ahnu-label').textContent = `Download ${ahnuFilename}`;
+      $('popup-share-section').classList.remove('hidden');
+      $('share-result-card').classList.add('hidden');
+      $('btn-create-share-link').disabled = false;
+    } else {
+      const entries = [];
+      const total = state.encryptFiles.length;
+      for (let i = 0; i < total; i++) {
+        const file = state.encryptFiles[i];
+        setProgress(
+          'encrypt',
+          true,
+          `Encrypting ${i + 1} of ${total}: ${file.name}`,
+          Math.round((i / total) * 85) + 5
+        );
+        const { ahnuBytes, ahnuFilename } = await encryptToAhnu(file, pw);
+        entries.push({ name: ahnuFilename, bytes: ahnuBytes });
+      }
+      setProgress('encrypt', true, 'Creating .zip archive...', 94);
+      const zipBytes = buildZipArchive(entries);
+      const zipFilename = 'vaultdrop-encrypted.zip';
+      state.preparedResult = {
+        isZip: true,
+        zipBytes,
+        zipFilename,
+        count: total,
+      };
+      $('encrypt-result-modal-title').textContent = `${total} Files Encrypted`;
+      $('encrypt-result-modal-sub').textContent =
+        'All files were converted to .ahnu and bundled into a single .zip archive:';
+      $('popup-download-title').innerHTML =
+        '1. Download Encrypted <code>.zip</code> Archive';
+      $('popup-download-meta').textContent = `${total} .ahnu files · ${formatBytes(zipBytes.length)}`;
+      $('btn-download-ahnu-label').textContent = `Download ${zipFilename}`;
+      $('popup-share-section').classList.add('hidden');
+    }
+
+    setProgress('encrypt', true, 'Complete!', 100);
+    openModal('modal-encrypt-result');
   } catch (err) {
     showToast(err.message || 'Encryption failed.', 'error');
   } finally {
-    setTimeout(() => setProgress('encrypt', false), 1200);
+    setTimeout(() => setProgress('encrypt', false), 600);
     updateEncryptActionButtons();
   }
 }
 
+function handleDownloadAhnu() {
+  const res = state.preparedResult;
+  if (!res) return;
+  if (res.isZip) {
+    triggerBlobDownload(res.zipBytes, 'application/zip', res.zipFilename);
+    showToast(`Downloaded ${res.zipFilename}`, 'success');
+  } else {
+    triggerBlobDownload(res.ahnuBytes, 'application/octet-stream', res.ahnuFilename);
+    showToast(`Downloaded ${res.ahnuFilename}`, 'success');
+  }
+}
+
 async function handleCreateShareLink() {
-  const pw = validateEncryptInputs();
-  if (!pw) return;
+  const resData = state.preparedResult;
+  if (!resData || resData.isZip) return;
 
   if (
     storageService.mode === 'firebase' &&
@@ -282,7 +403,7 @@ async function handleCreateShareLink() {
     return;
   }
 
-  if (state.encryptFile.size > MAX_SHARE_AHNU_BYTES - 4096) {
+  if (resData.ahnuBytes.length > MAX_SHARE_AHNU_BYTES) {
     showToast(
       `File is too large for link sharing (max ~12 MB). Use "Download .ahnu File" instead.`,
       'error'
@@ -292,26 +413,25 @@ async function handleCreateShareLink() {
 
   const btn = $('btn-create-share-link');
   btn.disabled = true;
-  $('btn-download-ahnu').disabled = true;
+  const labelSpan = btn.querySelector('span');
+  const prevLabel = labelSpan ? labelSpan.textContent : '';
+  if (labelSpan) labelSpan.textContent = 'Uploading encrypted link...';
   $('share-result-card').classList.add('hidden');
 
   try {
-    setProgress('encrypt', true, 'Encrypting into .ahnu format...', 10);
-    const { ahnuBytes, ahnuFilename, metadata } = await encryptToAhnu(
-      state.encryptFile,
-      pw,
-      (stage, pct) => setProgress('encrypt', true, stage, Math.round(pct * 0.45))
-    );
-
     const res = await storageService.createShareLink({
-      ahnuBytes,
-      category: metadata.category,
+      ahnuBytes: resData.ahnuBytes,
+      category: resData.metadata.category,
       ttlMinutes: state.ttlMinutes,
-      onProgress: (stage, pct) =>
-        setProgress('encrypt', true, stage, 45 + Math.round(pct * 0.55)),
+      onProgress: (stage, pct) => {
+        if (labelSpan) labelSpan.textContent = `${stage} (${pct}%)`;
+      },
     });
 
-    state.lastSharedAhnu = { bytes: ahnuBytes, filename: ahnuFilename };
+    state.lastSharedAhnu = {
+      bytes: resData.ahnuBytes,
+      filename: resData.ahnuFilename,
+    };
 
     const shareUrl = getShareUrl(res.shareId);
     $('share-result-url').value = shareUrl;
@@ -325,8 +445,8 @@ async function handleCreateShareLink() {
   } catch (err) {
     showToast(err.message || 'Failed to create share link.', 'error');
   } finally {
-    setTimeout(() => setProgress('encrypt', false), 1200);
-    updateEncryptActionButtons();
+    if (labelSpan) labelSpan.textContent = prevLabel || 'Generate Share Link';
+    btn.disabled = false;
   }
 }
 
@@ -350,6 +470,7 @@ async function handleSelectDecryptFile(file) {
     $('decrypt-file-name').textContent = file.name;
     $('decrypt-file-sub').textContent = `AHNU v${header.version} · AES-256-GCM · ${header.iterations.toLocaleString()} PBKDF2 rounds · ${formatBytes(file.size)}`;
     $('decrypt-file-card').classList.remove('hidden');
+    $('decrypt-dropzone').classList.add('hidden');
     updateDecryptButton();
   } catch (err) {
     showToast(err.message || 'Invalid .ahnu file.', 'error');
@@ -366,6 +487,7 @@ function clearDecryptFile() {
     state.cleanupDecryptViewer = null;
   }
   $('decrypt-file-card').classList.add('hidden');
+  $('decrypt-dropzone').classList.remove('hidden');
   $('decrypt-result-panel').classList.add('hidden');
   $('decrypt-empty-state').classList.remove('hidden');
   $('decrypt-output-badge').textContent = 'Locked';
@@ -706,7 +828,9 @@ async function init() {
     btn.addEventListener('click', () => {
       const input = $(btn.dataset.togglePw);
       if (!input) return;
-      input.type = input.type === 'password' ? 'text' : 'password';
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.classList.toggle('revealed', show);
     });
   });
 
@@ -753,11 +877,14 @@ async function init() {
     updateEncryptActionButtons
   );
 
-  // TTL presets & custom input (strictly capped at 24 hours)
+  // TTL presets, slider & custom input (strictly capped at 24 hours)
   document.querySelectorAll('.ttl-pill').forEach((pill) => {
     pill.addEventListener('click', () => {
       setTtlMinutes(Number(pill.dataset.minutes));
     });
+  });
+  $('ttl-range-slider')?.addEventListener('input', (e) => {
+    setTtlMinutes(Number(e.target.value));
   });
   $('custom-ttl-hours').addEventListener('input', (e) => {
     const hrs = Number(e.target.value);
@@ -768,6 +895,7 @@ async function init() {
     setTtlMinutes(Math.min(24, hrs) * 60);
   });
 
+  $('btn-encrypt-now').addEventListener('click', handleEncryptNow);
   $('btn-download-ahnu').addEventListener('click', handleDownloadAhnu);
   $('btn-create-share-link').addEventListener('click', handleCreateShareLink);
 
@@ -775,7 +903,32 @@ async function init() {
     const url = $('share-result-url').value;
     if (!url) return;
     await navigator.clipboard.writeText(url);
+    const btn = $('btn-copy-share-url');
+    const prev = btn.textContent;
+    btn.textContent = 'Copied ✓';
+    setTimeout(() => {
+      btn.textContent = prev;
+    }, 1600);
     showToast('Share link copied!', 'success');
+  });
+
+  $('btn-native-share')?.addEventListener('click', async () => {
+    const url = $('share-result-url').value;
+    if (!url) return;
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: 'VaultDrop Encrypted Media',
+          text: 'Open this encrypted VaultDrop link (ask me for the password separately):',
+          url,
+        });
+        return;
+      } catch (err) {
+        if (err?.name === 'AbortError') return;
+      }
+    }
+    await navigator.clipboard.writeText(url);
+    showToast('Share link copied to clipboard!', 'success');
   });
 
   $('btn-download-shared-ahnu').addEventListener('click', () => {
@@ -914,6 +1067,7 @@ async function init() {
   });
 
   await storageService.init();
+  initCursorRects();
   setTtlMinutes(60);
 
   // Check if opened via a ?share=ID link

@@ -37,6 +37,18 @@ test('validateMediaFile accepts all required photo, video, and audio extensions'
   assert.equal(invalid.valid, false);
 });
 
+test('validateMediaFile enforces per-category size limits (30MB photo, 200MB video, 60MB audio)', () => {
+  const MB = 1024 * 1024;
+  assert.equal(validateMediaFile({ name: 'ok.jpg', size: 30 * MB }).valid, true);
+  assert.equal(validateMediaFile({ name: 'big.jpg', size: 30 * MB + 1 }).valid, false);
+
+  assert.equal(validateMediaFile({ name: 'ok.mp4', size: 200 * MB }).valid, true);
+  assert.equal(validateMediaFile({ name: 'big.mp4', size: 200 * MB + 1 }).valid, false);
+
+  assert.equal(validateMediaFile({ name: 'ok.mp3', size: 60 * MB }).valid, true);
+  assert.equal(validateMediaFile({ name: 'big.mp3', size: 60 * MB + 1 }).valid, false);
+});
+
 test('encryptToAhnu and decryptFromAhnu round-trip preserves exact bytes and metadata', async () => {
   const originalBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8]);
   const { ahnuBytes, ahnuFilename, metadata } = await encryptToAhnu(

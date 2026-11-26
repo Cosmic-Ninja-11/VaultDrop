@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="vd-badge-grad" x1="6" y1="30" x2="36" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+  </defs>
+
+  <!-- Document Page -->
+  <path
+    d="M20 6H42L54 18V50C54 53.3137 51.3137 56 48 56H20C16.6863 56 14 53.3137 14 50V12C14 8.68629 16.6863 6 20 6Z"
+    fill="#ffffff"
+    stroke="#0f172a"
+    stroke-width="3.2"
+    stroke-linejoin="round"
+  />
+  <!-- Folded Corner -->
+  <path
+    d="M42 6V16C42 17.1046 42.8954 18 44 18H54"
+    stroke="#0f172a"
+    stroke-width="3.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Document Lines -->
+  <path d="M23 18H34" stroke="#0f172a" stroke-width="3" stroke-linecap="round" />
+  <path d="M23 26H45" stroke="#0f172a" stroke-width="3" stroke-linecap="round" />
+  <path d="M23 34H45" stroke="#0f172a" stroke-width="3" stroke-linecap="round" />
+  <path d="M36 42H45" stroke="#0f172a" stroke-width="3" stroke-linecap="round" />
+  <path d="M36 49H45" stroke="#0f172a" stroke-width="3" stroke-linecap="round" />
+
+  <!-- Rounded-Square Security Lock Badge (Bottom-Left) -->
+  <rect
+    x="5"
+    y="30"
+    width="29"
+    height="29"
+    rx="8"
+    fill="url(#vd-badge-grad)"
+    stroke="#0f172a"
+    stroke-width="3"
+  />
+
+  <!-- Padlock Shackle -->
+  <path
+    d="M14.5 42V38.8C14.5 36.149 16.7386 34 19.5 34C22.2614 34 24.5 36.149 24.5 38.8V42"
+    stroke="#ffffff"
+    stroke-width="2.6"
+    stroke-linecap="round"
+  />
+  <!-- Padlock Body -->
+  <rect x="12" y="41.5" width="15" height="11.5" rx="3" fill="#ffffff" />
+  <!-- Keyhole -->
+  <circle cx="19.5" cy="46" r="1.7" fill="#0f172a" />
+  <path
+    d="M19.5 47.2V50.2"
+    stroke="#0f172a"
+    stroke-width="2"
+    stroke-linecap="round"
+  />
+</svg>

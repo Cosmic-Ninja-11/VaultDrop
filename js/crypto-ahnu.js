@@ -33,16 +33,22 @@ export const AHNU_HEADER_LENGTH = 38; // 4 + 1 + 1 + 4 + 16 + 12
 export const SUPPORTED_MEDIA = {
   photo: {
     label: 'Photo',
+    maxMb: 30,
+    maxBytes: 30 * 1024 * 1024,
     extensions: ['.jpg', '.jpeg', '.png', '.heic'],
     mimes: ['image/jpeg', 'image/png', 'image/heic', 'image/heif'],
   },
   video: {
     label: 'Video',
+    maxMb: 200,
+    maxBytes: 200 * 1024 * 1024,
     extensions: ['.mp4', '.mov', '.mkv'],
     mimes: ['video/mp4', 'video/quicktime', 'video/x-matroska', 'video/matroska'],
   },
   audio: {
     label: 'Audio',
+    maxMb: 60,
+    maxBytes: 60 * 1024 * 1024,
     extensions: ['.mp3'],
     mimes: ['audio/mpeg', 'audio/mp3'],
   },
@@ -98,6 +104,12 @@ export function validateMediaFile(file) {
   const ext = getFileExtension(file.name);
   for (const [category, spec] of Object.entries(SUPPORTED_MEDIA)) {
     if (spec.extensions.includes(ext)) {
+      if (Number.isFinite(file.size) && file.size > spec.maxBytes) {
+        return {
+          valid: false,
+          error: `${spec.label} file exceeds the ${spec.maxMb} MB limit.`,
+        };
+      }
       const mime = file.type || MIME_BY_EXT[ext] || 'application/octet-stream';
       return {
         valid: true,

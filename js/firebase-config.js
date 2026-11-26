@@ -10,12 +10,12 @@
  */
 
 export const DEFAULT_FIREBASE_CONFIG = {
-  apiKey: 'YOUR_FIREBASE_API_KEY',
-  authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
-  projectId: 'YOUR_PROJECT_ID',
-  storageBucket: 'YOUR_PROJECT_ID.appspot.com',
-  messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-  appId: 'YOUR_APP_ID',
+  apiKey: 'AIzaSyCctZV2w1_fkc5klIll0jc3v_-qKsWJSdI',
+  authDomain: 'vaultdrop-53c41.firebaseapp.com',
+  projectId: 'vaultdrop-53c41',
+  storageBucket: 'vaultdrop-53c41.firebasestorage.app',
+  messagingSenderId: '167182003690',
+  appId: '1:167182003690:web:37734f6d06effcfcae1693',
 };
 
 const STORAGE_KEY = 'vaultdrop_firebase_config_v1';
