@@ -122,7 +122,7 @@ class VaultStorageService {
   }
 
   async init() {
-    const { config, source } = getActiveFirebaseConfig();
+    const { config, source } = await getActiveFirebaseConfig();
     this.configSource = source;
 
     if (!config) {

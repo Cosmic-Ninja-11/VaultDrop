@@ -1,21 +1,20 @@
 /**
  * Firebase Configuration for VaultDrop
  * =====================================
- * To enable public cross-device share links and Firebase Authentication on GitHub Pages:
- * 1. Create a free Firebase project at https://console.firebase.google.com/
- * 2. Enable Authentication (Email/Password, Google, and/or Anonymous)
- * 3. Create a Cloud Firestore database and deploy firestore.rules
- * 4. Replace the placeholder values below with your Web App's firebaseConfig
- *    (or configure it directly inside the app via "Firebase Setup" in the header).
+ * Credentials are loaded at runtime in this priority order:
+ *  1. Browser localStorage override (set via the in-app "Firebase Setup" modal)
+ *  2. Gitignored `js/firebase-env.js` generated from `.env` (via `python scripts/sync_env.py`)
+ *     or from GitHub Repository Secrets during GitHub Pages deployment
+ *  3. Fallback template below (keep placeholders only when committing to git)
  */
 
 export const DEFAULT_FIREBASE_CONFIG = {
-  apiKey: 'AIzaSyCctZV2w1_fkc5klIll0jc3v_-qKsWJSdI',
-  authDomain: 'vaultdrop-53c41.firebaseapp.com',
-  projectId: 'vaultdrop-53c41',
-  storageBucket: 'vaultdrop-53c41.firebasestorage.app',
-  messagingSenderId: '167182003690',
-  appId: '1:167182003690:web:37734f6d06effcfcae1693',
+  apiKey: 'YOUR_FIREBASE_API_KEY',
+  authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
+  projectId: 'YOUR_PROJECT_ID',
+  storageBucket: 'YOUR_PROJECT_ID.firebasestorage.app',
+  messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+  appId: 'YOUR_APP_ID',
 };
 
 const STORAGE_KEY = 'vaultdrop_firebase_config_v1';
@@ -31,7 +30,19 @@ export function isFirebaseConfigured(cfg) {
   );
 }
 
-export function getActiveFirebaseConfig() {
+async function loadEnvModuleConfig() {
+  try {
+    const mod = await import('./firebase-env.js');
+    if (isFirebaseConfigured(mod?.FIREBASE_CONFIG)) {
+      return mod.FIREBASE_CONFIG;
+    }
+  } catch {
+    // js/firebase-env.js is gitignored and optional before running sync_env.py
+  }
+  return null;
+}
+
+export async function getActiveFirebaseConfig() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -42,6 +53,11 @@ export function getActiveFirebaseConfig() {
     }
   } catch {
     // Ignore storage read errors
+  }
+
+  const envConfig = await loadEnvModuleConfig();
+  if (envConfig) {
+    return { config: envConfig, source: 'env' };
   }
 
   if (isFirebaseConfigured(DEFAULT_FIREBASE_CONFIG)) {

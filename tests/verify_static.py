@@ -3,14 +3,14 @@ import re
 
 root = pathlib.Path(__file__).resolve().parent.parent
 html = (root / "index.html").read_text(encoding="utf-8")
-css = (root / "css" / "styles.css").read_text(encoding="utf-8")
 
 # 1. Verify HTML referenced local assets exist
 for asset in ["css/styles.css", "js/app.js"]:
     assert asset in html, f"Missing reference to {asset} in index.html"
     assert (root / asset).exists(), f"Missing file {asset}"
 
-# 2. Verify all ES module local imports resolve to existing files
+# 2. Verify all static ES module local imports resolve to existing files
+#    (skip optional gitignored ./firebase-env.js dynamic import)
 for js in (root / "js").glob("*.js"):
     txt = js.read_text(encoding="utf-8")
     for m in re.finditer(r"""from\s+['"](\./[^'"]+)['"]""", txt):
@@ -34,9 +34,20 @@ for ext in [".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov", ".mkv", ".mp3"]:
     assert ext in crypto_js, f"Missing {ext} in crypto-ahnu.js"
     assert ext in html, f"Missing {ext} in index.html"
 
-# 5. Verify firestore.rules enforces 24h max expiry
-rules = (root / "firestore.rules").read_text(encoding="utf-8")
-assert "duration.value(24, 'h')" in rules
-assert "ttlMinutes <= 1440" in rules
+# 5. Verify .gitignore keeps .env, js/firebase-env.js, and firestore.rules untracked
+gitignore = (root / ".gitignore").read_text(encoding="utf-8")
+for entry in [".env", "js/firebase-env.js", "firestore.rules"]:
+    assert entry in gitignore, f"Missing {entry} in .gitignore"
+
+# 6. Verify firebase-config.js has no hardcoded real credentials
+fb_cfg = (root / "js" / "firebase-config.js").read_text(encoding="utf-8")
+assert "YOUR_FIREBASE_API_KEY" in fb_cfg and "AIza" not in fb_cfg
+
+# 7. Verify generated firestore.rules (if present locally) enforces 24h max expiry
+rules_path = root / "firestore.rules"
+if rules_path.exists():
+    rules = rules_path.read_text(encoding="utf-8")
+    assert "duration.value(24, 'h')" in rules
+    assert "ttlMinutes <= 1440" in rules
 
 print("All static integrity checks passed!")

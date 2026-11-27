@@ -1,0 +1,12 @@
+# Environment & generated Firebase files (never push to git)
+.env
+.env.*
+!.env.example
+js/firebase-env.js
+firestore.rules
+
+# OS / Python caches
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
